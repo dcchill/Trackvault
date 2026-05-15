@@ -42,6 +42,14 @@ Optional environment variables:
 
 Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg`, `.opus`, and `.webm`.
 
+## TrueNAS SCALE
+
+TrackVault includes a TrueNAS SCALE custom app package in `deploy/truenas/`.
+
+The easiest path is to publish the Docker image with the included GitHub Actions workflow, then paste `deploy/truenas/trackvault.yaml` into TrueNAS **Install via YAML**.
+
+See `deploy/truenas/README.md` for the full setup.
+
 ## Disclaimer : Support your artists
 
 TrackVault does not support pirating music, acquire your music legally and support artists.

@@ -1,44 +1,83 @@
 # TrackVault on TrueNAS SCALE
 
-This package targets **TrueNAS SCALE** as a Docker-based custom app.
+TrackVault installs on **TrueNAS SCALE 24.10 or newer** as a Docker Compose custom app.
 
-It is not a TrueNAS CORE jail/plugin. CORE plugins are obsolete; SCALE Apps/custom YAML is the practical deployment path.
+This is not a TrueNAS CORE jail/plugin. The practical SCALE path is **Apps > Install via YAML**.
 
-## Build the Image
+## Easiest Install
 
-From this repository:
+Use this path after pushing TrackVault to GitHub.
 
-```powershell
+1. In your GitHub repo, go to **Actions** and run **Build Docker Image**.
+2. In GitHub, make the `trackvault` container package public, or keep it private and configure TrueNAS registry credentials.
+3. In TrueNAS, create these datasets:
+   - `/mnt/POOL/apps/trackvault/data`
+   - `/mnt/POOL/media/music`
+4. Edit `deploy/truenas/trackvault.yaml`:
+   - replace `YOUR_GITHUB_USERNAME`
+   - replace `POOL`
+   - change port `8096` if needed
+5. TrueNAS: **Apps > Discover Apps > more menu > Install via YAML**.
+6. Paste the edited `trackvault.yaml` and save.
+7. Open `http://TRUENAS-IP:8096/app`.
+
+The admin UI is at `http://TRUENAS-IP:8096/admin`.
+
+## Local Image Install
+
+Use this only if you do not want to publish a Docker image.
+
+From a shell on the TrueNAS host, inside the TrackVault repository:
+
+```sh
 docker build -t trackvault:latest .
 ```
 
-For a TrueNAS system, either push that image to a registry and replace `trackvault:latest` in `compose.yaml`, or build/import the image on the TrueNAS host.
+Then install with `deploy/truenas/trackvault-local-image.yaml`.
 
-## Datasets
+That YAML has:
 
-Create datasets similar to:
+```yaml
+pull_policy: never
+```
 
-- `/mnt/POOL/apps/trackvault/data` for TrackVault state
-- `/mnt/POOL/media/music` for your music library
+so TrueNAS uses the local `trackvault:latest` image instead of trying to pull it from Docker Hub.
 
-Edit `deploy/truenas/compose.yaml` and replace `POOL` and paths with your real dataset paths.
+## Dataset Helper
 
-## Install as a SCALE Custom App
+If you are using SSH on TrueNAS, this creates the expected folders:
 
-In TrueNAS SCALE:
+```sh
+sh deploy/truenas/prepare-datasets.sh POOL
+```
 
-1. Go to **Apps**.
-2. Use **Install via YAML**.
-3. Paste the contents of `deploy/truenas/compose.yaml`.
-4. Update dataset paths and image name if needed.
-5. Save/deploy.
-6. Open `http://TRUENAS-IP:8096/app`.
+Example:
 
-The container stores `settings.json`, `library.json`, `favorites.json`, and `playlists.json` in `/data`.
+```sh
+sh deploy/truenas/prepare-datasets.sh tank
+```
+
+Put your music files in:
+
+```text
+/mnt/POOL/media/music
+```
+
+TrackVault writes its state here:
+
+```text
+/mnt/POOL/apps/trackvault/data
+```
+
+## Files
+
+- `trackvault.yaml`: recommended YAML for a published GHCR image.
+- `trackvault-local-image.yaml`: fallback YAML for a locally built image.
+- `prepare-datasets.sh`: optional helper for creating TrueNAS dataset mount folders.
+- `compose.yaml`: older simple compose example.
 
 ## Notes
 
 - The music mount is read-only by default.
-- Change the host port if `8096` conflicts with another app.
 - In the TrackVault admin UI, the library path inside the container should be `/music`.
-- If your SCALE version expects Compose YAML, use `deploy/truenas/compose.yaml` directly.
+- If the app fails to deploy, check `/var/log/app_lifecycle.log` on TrueNAS.

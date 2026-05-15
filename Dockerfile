@@ -7,14 +7,12 @@ ENV PORT=8096
 ENV TRACKVAULT_DATA=/data
 ENV TRACKVAULT_LIBRARY=/music
 
-COPY package.json package-lock.json* ./
+COPY package.json ./
 COPY server.js ./
 COPY public ./public
 COPY Track.png Track_notext.png ./
 
 RUN mkdir -p /data /music && chown -R node:node /app /data /music
-
-USER node
 
 EXPOSE 8096
 
