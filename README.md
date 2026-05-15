@@ -11,6 +11,12 @@ TrackVault is a self-hosted music server, meaning no ads and you control your mu
 
 It runs on built-in Node.js APIs and stores local state in `.trackvault/`.
 
+## Help keep TrackVault free
+
+I want to keep TrackVault always free and open source.  Feel free to support my work, anything helps!  Of course it is not required so do not feel like you have to.
+
+[![](https://media.forgecdn.net/attachments/description/829272/description_36e68a7a-8da7-49a4-82f4-02400e7e54d2.png)](https://ko-fi.com/dcchill)
+
 ## Run
 
 On Windows, double-click `Start TrackVault.bat`. It starts the server and opens the player UI.
