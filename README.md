@@ -1,6 +1,8 @@
 # TrackVault
 
-## Support your artists
+<img src="./Track.png" alt="TrackVault Logo" width="400" height="400">
+
+## Disclaimer : Support your artists
 
 TrackVault does not support pirating music, acquire your music legally and support artists.
 
@@ -10,6 +12,8 @@ To acquire music files check out
 - https://www.qobuz.com/us-en/discover
 
 If you are going to pirate music, at least support the artist and buy their albums first.
+
+## TrackVault
 
 TrackVault is a self-hosted music server with two browser UIs:
 
