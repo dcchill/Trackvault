@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TrackVault</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="client-page">
+    <header class="topbar client-topbar">
+      <a class="brand" href="/app" aria-label="TrackVault player">
+        <span class="brand-mark">TV</span>
+        <span>
+          <strong id="server-label">TrackVault</strong>
+          <small>Player</small>
+        </span>
+      </a>
+      <div class="search-shell">
+        <input id="search-input" type="search" placeholder="Search music" autocomplete="off">
+      </div>
+      <nav class="topbar-actions" aria-label="Primary">
+        <a class="button secondary" href="/admin">Admin</a>
+      </nav>
+    </header>
+
+    <main class="client-layout">
+      <aside class="sidebar" aria-label="Library navigation">
+        <div class="segmented vertical" id="view-buttons" role="tablist" aria-label="Views">
+          <button class="active" type="button" data-view="tracks">Tracks</button>
+          <button type="button" data-view="albums">Albums</button>
+          <button type="button" data-view="artists">Artists</button>
+          <button type="button" data-view="favorites">Favorites</button>
+        </div>
+
+        <section class="nav-section" aria-labelledby="artists-nav-title">
+          <h2 id="artists-nav-title">Artists</h2>
+          <div id="artist-list" class="nav-list"></div>
+        </section>
+
+        <section class="nav-section" aria-labelledby="genres-nav-title">
+          <h2 id="genres-nav-title">Genres</h2>
+          <div id="genre-list" class="nav-list"></div>
+        </section>
+      </aside>
+
+      <section class="library-main" aria-labelledby="view-title">
+        <div class="library-head">
+          <div>
+            <h1 id="view-title">Tracks</h1>
+            <p id="view-meta" class="muted"></p>
+          </div>
+          <div class="head-actions">
+            <button id="play-visible" class="button accent" type="button">Play Visible</button>
+            <button id="shuffle-visible" class="button secondary" type="button">Shuffle</button>
+          </div>
+        </div>
+
+        <div id="album-grid" class="album-grid"></div>
+        <div id="track-list" class="track-list" role="list"></div>
+      </section>
+
+      <aside class="queue-panel" aria-labelledby="queue-title">
+        <div class="section-heading">
+          <h2 id="queue-title">Queue</h2>
+          <button id="clear-queue" class="icon-button" type="button" aria-label="Clear queue">x</button>
+        </div>
+        <div id="queue-list" class="queue-list"></div>
+      </aside>
+    </main>
+
+    <footer class="player-bar" aria-label="Audio player">
+      <img id="player-art" class="player-art" alt="" src="/api/albums/empty/art">
+      <div class="player-now">
+        <strong id="player-title">Nothing playing</strong>
+        <span id="player-subtitle">TrackVault</span>
+      </div>
+      <div class="player-controls">
+        <button id="previous-track" class="icon-button" type="button" aria-label="Previous track">|&lt;</button>
+        <button id="play-toggle" class="button accent" type="button">Play</button>
+        <button id="next-track" class="icon-button" type="button" aria-label="Next track">&gt;|</button>
+      </div>
+      <audio id="audio-player" controls preload="metadata"></audio>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

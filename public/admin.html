@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TrackVault Admin</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="admin-page">
+    <header class="topbar">
+      <a class="brand" href="/admin" aria-label="TrackVault admin">
+        <span class="brand-mark">TV</span>
+        <span>
+          <strong>TrackVault</strong>
+          <small>Admin</small>
+        </span>
+      </a>
+      <nav class="topbar-actions" aria-label="Primary">
+        <a class="button secondary" href="/app">Open Player</a>
+      </nav>
+    </header>
+
+    <main class="admin-grid">
+      <section class="panel settings-panel" aria-labelledby="settings-title">
+        <div class="section-heading">
+          <h1 id="settings-title">Server</h1>
+          <span id="scan-status" class="status-pill">Idle</span>
+        </div>
+
+        <form id="settings-form" class="settings-form">
+          <label>
+            <span>Server name</span>
+            <input id="server-name" name="serverName" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Music library path</span>
+            <input id="library-path" name="libraryPath" type="text" autocomplete="off">
+          </label>
+          <label class="switch-row">
+            <input id="scan-on-start" name="scanOnStart" type="checkbox">
+            <span>Scan on start</span>
+          </label>
+          <div class="form-actions">
+            <button class="button" type="submit">Save</button>
+            <button id="scan-button" class="button accent" type="button">Scan Library</button>
+          </div>
+        </form>
+
+        <div id="admin-message" class="message" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="admin-workspace">
+        <div class="metric-grid" aria-label="Library summary">
+          <article class="metric-card">
+            <span>Tracks</span>
+            <strong id="metric-tracks">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Albums</span>
+            <strong id="metric-albums">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Artists</span>
+            <strong id="metric-artists">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Storage</span>
+            <strong id="metric-storage">0 B</strong>
+          </article>
+        </div>
+
+        <section class="panel" aria-labelledby="library-title">
+          <div class="section-heading">
+            <h2 id="library-title">Library</h2>
+            <span id="last-scan" class="muted">Never scanned</span>
+          </div>
+          <div id="album-preview" class="album-strip"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="tracks-title">
+          <div class="section-heading">
+            <h2 id="tracks-title">Tracks</h2>
+            <span id="library-root" class="muted path-text"></span>
+          </div>
+          <div id="track-preview" class="admin-track-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/admin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,4 @@
+.trackvault/
+library/
+node_modules/
+*.log
