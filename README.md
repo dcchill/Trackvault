@@ -1,5 +1,16 @@
 # TrackVault
 
+## Support your artists
+
+TrackVault does not support pirating music, acquire your music legally and support artists.
+
+To acquire music files check out
+
+- https://bandcamp.com/
+- https://www.qobuz.com/us-en/discover
+
+If you are going to pirate music, at least support the artist and buy their albums first.
+
 TrackVault is a self-hosted music server with two browser UIs:
 
 - `http://localhost:8096/admin` for server settings, scans, and library health
