@@ -2,20 +2,9 @@
 
 <img src="./Track.png" alt="TrackVault Logo" width="400" height="400">
 
-## Disclaimer : Support your artists
-
-TrackVault does not support pirating music, acquire your music legally and support artists.
-
-To acquire music files check out
-
-- https://bandcamp.com/
-- https://www.qobuz.com/us-en/discover
-
-If you are going to pirate music, at least support the artist and buy their albums first.
-
 ## TrackVault
 
-TrackVault is a self-hosted music server with two browser UIs:
+TrackVault is a self-hosted music server, meaning no ads and you control your music.  Download this on your host computer and create a tunnel / port forward to access it from outside your network.
 
 - `http://localhost:8096/admin` for server settings, scans, and library health
 - `http://localhost:8096/app` for browsing and playing the music library
@@ -46,3 +35,14 @@ Optional environment variables:
 - `TRACKVAULT_DATA`: state directory, defaults to `.trackvault`
 
 Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg`, `.opus`, and `.webm`.
+
+## Disclaimer : Support your artists
+
+TrackVault does not support pirating music, acquire your music legally and support artists.
+
+To acquire music files check out
+
+- https://bandcamp.com/
+- https://www.qobuz.com/us-en/discover
+
+If you are going to pirate music, at least support the artist and buy their albums first.
