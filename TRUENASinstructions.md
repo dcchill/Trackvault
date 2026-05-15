@@ -6,20 +6,18 @@ This is not a TrueNAS CORE jail/plugin. The practical SCALE path is **Apps > Ins
 
 ## Easiest Install
 
-Use this path after pushing TrackVault to GitHub.
+Use `trackvault.yaml` for normal installs. Users do not need to build the image.
 
-1. In your GitHub repo, go to **Actions** and run **Build Docker Image**.
-2. In GitHub, make the `trackvault` container package public, or keep it private and configure TrueNAS registry credentials.
-3. In TrueNAS, create these datasets:
+1. In TrueNAS, create or choose these paths:
    - `/mnt/POOL/apps/trackvault/data`
    - `/mnt/POOL/media/music`
-4. Edit `deploy/truenas/trackvault.yaml`:
-   - replace `YOUR_GITHUB_USERNAME`
-   - replace `POOL`
+2. Edit `deploy/truenas/trackvault.yaml`:
+   - replace `POOL` with your real pool name
+   - change the music path if your music is in a different dataset
    - change port `8096` if needed
-5. TrueNAS: **Apps > Discover Apps > more menu > Install via YAML**.
-6. Paste the edited `trackvault.yaml` and save.
-7. Open `http://TRUENAS-IP:8096/app`.
+3. TrueNAS: **Apps > Discover Apps > more menu > Install via YAML**.
+4. Paste the edited `trackvault.yaml` and save.
+5. Open `http://TRUENAS-IP:8096/app`.
 
 The admin UI is at `http://TRUENAS-IP:8096/admin`.
 

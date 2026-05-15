@@ -44,9 +44,112 @@ Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg
 
 ## TrueNAS SCALE
 
-TrackVault includes a TrueNAS SCALE custom app package in `deploy/truenas/`.
+TrackVault can be installed on TrueNAS SCALE with **Install via YAML**. Users do not need to build the image themselves.
 
-The easiest path is to publish the Docker image with the included GitHub Actions workflow, then paste `deploy/truenas/trackvault.yaml` into TrueNAS **Install via YAML**.
+### 1. Copy the YAML
+
+Open:
+
+```text
+deploy/truenas/trackvault.yaml
+```
+
+It uses the public TrackVault image:
+
+```text
+ghcr.io/dcchill/trackvault:latest
+```
+
+### 2. Prepare TrueNAS Paths
+
+Create or choose two TrueNAS paths:
+
+```text
+/mnt/POOL/apps/trackvault/data
+/mnt/POOL/media/music
+```
+
+Replace `POOL` with your real pool name.
+
+Examples:
+
+```text
+/mnt/tank/apps/trackvault/data
+/mnt/tank/media/music
+```
+
+Put your music files in the music path.
+
+### 3. Edit the YAML
+
+Replace:
+
+```text
+POOL
+```
+
+with your TrueNAS pool name.
+
+Example:
+
+```yaml
+services:
+  trackvault:
+    image: ghcr.io/dcchill/trackvault:latest
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    environment:
+      PORT: "8096"
+      TRACKVAULT_DATA: /data
+      TRACKVAULT_LIBRARY: /music
+    volumes:
+      - /mnt/tank/apps/trackvault/data:/data
+      - /mnt/tank/media/music:/music:ro
+```
+
+Change `8096:8096` if port `8096` is already used.
+
+If your music is not in `/mnt/POOL/media/music`, change the left side of this mount to your real music dataset:
+
+```yaml
+- /mnt/POOL/media/music:/music:ro
+```
+
+Keep the right side as `/music:ro`.
+
+### 4. Install on TrueNAS
+
+1. In TrueNAS, go to **Apps**.
+2. Go to **Discover Apps**.
+3. Open the three-dot menu.
+4. Click **Install via YAML**.
+5. Enter the app name:
+
+```text
+trackvault
+```
+
+6. Paste the edited YAML.
+7. Click **Save**.
+
+Open the player:
+
+```text
+http://TRUENAS-IP:8096/app
+```
+
+Open the admin page:
+
+```text
+http://TRUENAS-IP:8096/admin
+```
+
+In the admin page, the library path should be:
+
+```text
+/music
+```
 
 See `deploy/truenas/README.md` for the full setup.
 

@@ -1,6 +1,6 @@
 services:
   trackvault:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/trackvault:latest
+    image: ghcr.io/dcchill/trackvault:latest
     restart: unless-stopped
     ports:
       - "8096:8096"
