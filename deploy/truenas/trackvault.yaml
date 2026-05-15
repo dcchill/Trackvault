@@ -1,6 +1,7 @@
 services:
   trackvault:
     image: ghcr.io/dcchill/trackvault:latest
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "8096:8096"

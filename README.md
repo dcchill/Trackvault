@@ -98,6 +98,7 @@ Example:
 services:
   trackvault:
     image: ghcr.io/dcchill/trackvault:latest
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "8096:8096"
@@ -153,7 +154,34 @@ In the admin page, the library path should be:
 /music
 ```
 
-See `deploy/truenas/README.md` for the full setup.
+### Updating on TrueNAS
+
+When a new TrackVault image is published, TrueNAS may keep using the old cached `latest` image unless the YAML tells it to pull again.
+
+Make sure your YAML has:
+
+```yaml
+pull_policy: always
+```
+
+Then in TrueNAS:
+
+1. Open **Apps**.
+2. Open the TrackVault app.
+3. Edit the app YAML.
+4. Confirm this line is present under `image`:
+
+```yaml
+pull_policy: always
+```
+
+5. Save/redeploy the app.
+
+If it still does not update, stop and delete the TrackVault app, then install it again with the same YAML. Your data stays safe as long as this mount stays the same:
+
+```yaml
+- /mnt/POOL/apps/trackvault/data:/data
+```
 
 ## Disclaimer : Support your artists
 
