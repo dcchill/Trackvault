@@ -1,11 +1,21 @@
 # TrackVault
 
-TrackVault is a self-hosted music server with two browser UIs:
+<img src="./Track.png" alt="TrackVault Logo" width="400" height="400">
+
+## TrackVault
+
+TrackVault is a self-hosted music server, meaning no ads and you control your music.  Download this on your host computer and create a tunnel / port forward to access it from outside your network.
 
 - `http://localhost:8096/admin` for server settings, scans, and library health
 - `http://localhost:8096/app` for browsing and playing the music library
 
 It runs on built-in Node.js APIs and stores local state in `.trackvault/`.
+
+## Help keep TrackVault free
+
+I want to keep TrackVault always free and open source.  Feel free to support my work, anything helps!  Of course it is not required so do not feel like you have to.
+
+[![](https://media.forgecdn.net/attachments/description/829272/description_36e68a7a-8da7-49a4-82f4-02400e7e54d2.png)](https://ko-fi.com/dcchill)
 
 ## Run
 
@@ -32,12 +42,13 @@ Optional environment variables:
 
 Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg`, `.opus`, and `.webm`.
 
-## Docker and TrueNAS SCALE
+## Disclaimer : Support your artists
 
-TrackVault includes a `Dockerfile`, local `docker-compose.yml`, and a TrueNAS SCALE compose example in `deploy/truenas/`.
+TrackVault does not support pirating music, acquire your music legally and support artists.
 
-```powershell
-docker compose up --build
-```
+To acquire music files check out
 
-For TrueNAS SCALE custom app setup, see `deploy/truenas/README.md`.
+- https://bandcamp.com/
+- https://www.qobuz.com/us-en/discover
+
+If you are going to pirate music, at least support the artist and buy their albums first.
