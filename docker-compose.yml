@@ -1,0 +1,15 @@
+services:
+  trackvault:
+    build: .
+    image: trackvault:latest
+    container_name: trackvault
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    environment:
+      PORT: "8096"
+      TRACKVAULT_DATA: /data
+      TRACKVAULT_LIBRARY: /music
+    volumes:
+      - ./trackvault-data:/data
+      - ./library:/music:ro

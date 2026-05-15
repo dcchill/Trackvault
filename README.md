@@ -31,3 +31,13 @@ Optional environment variables:
 - `TRACKVAULT_DATA`: state directory, defaults to `.trackvault`
 
 Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg`, `.opus`, and `.webm`.
+
+## Docker and TrueNAS SCALE
+
+TrackVault includes a `Dockerfile`, local `docker-compose.yml`, and a TrueNAS SCALE compose example in `deploy/truenas/`.
+
+```powershell
+docker compose up --build
+```
+
+For TrueNAS SCALE custom app setup, see `deploy/truenas/README.md`.
