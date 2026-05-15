@@ -3,6 +3,13 @@
   "short_name": "TrackVault",
   "start_url": "/app",
   "display": "standalone",
-  "background_color": "#f6f3ed",
-  "theme_color": "#0f766e"
+  "background_color": "#000000",
+  "theme_color": "#FF8848",
+  "icons": [
+    {
+      "src": "/track_notext.png",
+      "sizes": "1800x1800",
+      "type": "image/png"
+    }
+  ]
 }

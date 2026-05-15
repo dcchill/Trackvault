@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>TrackVault Admin</title>
     <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/track_notext.png">
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body class="admin-page">
     <header class="topbar">
       <a class="brand" href="/admin" aria-label="TrackVault admin">
-        <span class="brand-mark">TV</span>
+        <img class="brand-logo" src="/track_notext.png" alt="">
         <span>
           <strong>TrackVault</strong>
           <small>Admin</small>
@@ -45,6 +46,11 @@
             <button class="button" type="submit">Save</button>
             <button id="scan-button" class="button accent" type="button">Scan Library</button>
           </div>
+          <div class="form-actions">
+            <button id="clear-library-button" class="button danger" type="button">Clear library.json</button>
+            <button id="clear-playlists-button" class="button danger" type="button">Clear playlists.json</button>
+          </div>
+          <button id="shutdown-button" class="button danger" type="button">Shut Down TrackVault</button>
         </form>
 
         <div id="admin-message" class="message" role="status" aria-live="polite"></div>

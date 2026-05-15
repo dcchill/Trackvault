@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>TrackVault</title>
     <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/track_notext.png">
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body class="client-page">
     <header class="topbar client-topbar">
       <a class="brand" href="/app" aria-label="TrackVault player">
-        <span class="brand-mark">TV</span>
+        <img class="brand-logo" src="/track_notext.png" alt="">
         <span>
           <strong id="server-label">TrackVault</strong>
           <small>Player</small>
@@ -30,8 +31,18 @@
           <button class="active" type="button" data-view="tracks">Tracks</button>
           <button type="button" data-view="albums">Albums</button>
           <button type="button" data-view="artists">Artists</button>
+          <button type="button" data-view="playlists">Playlists</button>
           <button type="button" data-view="favorites">Favorites</button>
         </div>
+
+        <section class="nav-section" aria-labelledby="playlists-nav-title">
+          <h2 id="playlists-nav-title">Playlists</h2>
+          <form id="client-playlist-form" class="client-playlist-form">
+            <input id="client-playlist-name" type="text" placeholder="New playlist" autocomplete="off" aria-label="New playlist name">
+            <button class="icon-button" type="submit" aria-label="Create playlist">+</button>
+          </form>
+          <div id="playlist-nav-list" class="nav-list"></div>
+        </section>
 
         <section class="nav-section" aria-labelledby="artists-nav-title">
           <h2 id="artists-nav-title">Artists</h2>
@@ -57,6 +68,17 @@
         </div>
 
         <div id="album-grid" class="album-grid"></div>
+        <div class="bulk-actions" id="bulk-actions">
+          <label class="bulk-select-all">
+            <input id="select-visible" type="checkbox">
+            <span id="selected-count">0 selected</span>
+          </label>
+          <select id="bulk-playlist-select" class="playlist-select" aria-label="Add selected tracks to playlist">
+            <option value="">Add selected to playlist</option>
+          </select>
+          <button id="bulk-remove" class="button secondary" type="button">Remove selected</button>
+          <button id="clear-selection" class="button secondary" type="button">Clear selection</button>
+        </div>
         <div id="track-list" class="track-list" role="list"></div>
       </section>
 
@@ -70,17 +92,36 @@
     </main>
 
     <footer class="player-bar" aria-label="Audio player">
-      <img id="player-art" class="player-art" alt="" src="/api/albums/empty/art">
-      <div class="player-now">
-        <strong id="player-title">Nothing playing</strong>
-        <span id="player-subtitle">TrackVault</span>
+      <div class="player-left">
+        <img id="player-art" class="player-art" alt="" src="/api/albums/empty/art">
+        <div class="player-now">
+          <strong id="player-title">Nothing playing</strong>
+          <span id="player-subtitle">TrackVault</span>
+        </div>
       </div>
-      <div class="player-controls">
-        <button id="previous-track" class="icon-button" type="button" aria-label="Previous track">|&lt;</button>
-        <button id="play-toggle" class="button accent" type="button">Play</button>
-        <button id="next-track" class="icon-button" type="button" aria-label="Next track">&gt;|</button>
+
+      <div class="player-center">
+        <div class="progress-shell">
+          <button id="progress-play" class="icon-button compact" type="button" aria-label="Play or pause">&gt;</button>
+          <input id="seek-slider" class="seek-slider" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+          <span id="current-time" class="time-label">0:00</span>
+          <span class="time-divider">/</span>
+          <span id="duration-time" class="time-label">0:00</span>
+          <button id="mute-toggle" class="icon-button compact" type="button" aria-label="Mute">Vol</button>
+          <input id="volume-slider" class="volume-slider" type="range" min="0" max="1" value="1" step="0.01" aria-label="Volume">
+        </div>
+        <div class="player-controls">
+          <button id="previous-track" class="icon-button" type="button" aria-label="Previous track">|&lt;</button>
+          <button id="play-toggle" class="button accent" type="button">Play</button>
+          <button id="next-track" class="icon-button" type="button" aria-label="Next track">&gt;|</button>
+        </div>
       </div>
-      <audio id="audio-player" controls preload="metadata"></audio>
+
+      <div class="blob-stage">
+        <canvas id="music-blob" class="music-blob" width="240" height="160" aria-hidden="true"></canvas>
+      </div>
+
+      <audio id="audio-player" preload="metadata"></audio>
     </footer>
 
     <script src="/app.js"></script>

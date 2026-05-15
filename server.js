@@ -30,6 +30,7 @@ let settings = {};
 let library = emptyLibrary();
 let favorites = { tracks: [] };
 let playlists = [];
+let httpServer = null;
 let scanState = {
   active: false,
   startedAt: null,
@@ -66,8 +67,8 @@ async function main() {
     await writeJson(SETTINGS_FILE, settings);
   }
 
-  const server = http.createServer(handleRequest);
-  server.listen(PORT, () => {
+  httpServer = http.createServer(handleRequest);
+  httpServer.listen(PORT, () => {
     console.log(`TrackVault listening on http://localhost:${PORT}`);
     console.log(`Admin UI: http://localhost:${PORT}/admin`);
     console.log(`Client UI: http://localhost:${PORT}/app`);
@@ -162,6 +163,18 @@ async function handleApi(req, res, url) {
     return runScan(res);
   }
 
+  if (req.method === "POST" && url.pathname === "/api/library/clear") {
+    return clearLibrary(res);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/playlists/clear") {
+    return clearPlaylists(res);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/shutdown") {
+    return shutdownServer(res);
+  }
+
   if (req.method === "GET" && url.pathname === "/api/library") {
     return sendJson(res, 200, filteredLibrary(url.searchParams));
   }
@@ -200,6 +213,18 @@ async function handleApi(req, res, url) {
     playlists.push(playlist);
     await writeJson(PLAYLISTS_FILE, playlists);
     return sendJson(res, 201, publicPlaylist(playlist));
+  }
+
+  const playlistMatch = url.pathname.match(/^\/api\/playlists\/([^/]+)$/);
+  if (playlistMatch && req.method === "DELETE") {
+    const playlistId = decodeURIComponent(playlistMatch[1]);
+    const existingLength = playlists.length;
+    playlists = playlists.filter((item) => item.id !== playlistId);
+    if (playlists.length === existingLength) {
+      return sendJson(res, 404, { error: "Playlist not found" });
+    }
+    await writeJson(PLAYLISTS_FILE, playlists);
+    return sendJson(res, 200, { ok: true });
   }
 
   const playlistTrackMatch = url.pathname.match(/^\/api\/playlists\/([^/]+)\/tracks(?:\/([^/]+))?$/);
@@ -261,6 +286,33 @@ async function runScan(res) {
   } catch (error) {
     return sendJson(res, 500, { error: error.message, scan: scanState });
   }
+}
+
+async function clearLibrary(res) {
+  if (scanState.active) {
+    return sendJson(res, 409, { error: "Cannot clear library while a scan is running", scan: scanState });
+  }
+  library = emptyLibrary();
+  await writeJson(LIBRARY_FILE, library);
+  return sendJson(res, 200, statusPayload());
+}
+
+async function clearPlaylists(res) {
+  playlists = [];
+  await writeJson(PLAYLISTS_FILE, playlists);
+  return sendJson(res, 200, { playlists: [] });
+}
+
+function shutdownServer(res) {
+  sendJson(res, 200, { ok: true, message: "TrackVault is shutting down" });
+  setTimeout(() => {
+    if (httpServer) {
+      httpServer.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 1500).unref();
+      return;
+    }
+    process.exit(0);
+  }, 150).unref();
 }
 
 async function performScan() {
@@ -961,12 +1013,10 @@ function generatedAlbumSvg(seed, title, artist) {
 
 function colorPalette(seed) {
   const palettes = [
-    ["#0f766e", "#d97706", "#111827"],
-    ["#be123c", "#f59e0b", "#1f2937"],
-    ["#2563eb", "#16a34a", "#18181b"],
-    ["#7c2d12", "#0891b2", "#27272a"],
-    ["#4338ca", "#dc2626", "#0f172a"],
-    ["#047857", "#c2410c", "#1f2937"]
+    ["#ff8848", "#000000", "#1a1a1a"],
+    ["#000000", "#ff8848", "#2b170d"],
+    ["#ff9b68", "#111111", "#000000"],
+    ["#1f1f1f", "#ff8848", "#000000"]
   ];
   return palettes[parseInt(seed.slice(0, 2), 16) % palettes.length];
 }
@@ -994,6 +1044,12 @@ async function serveStatic(req, res, pathname) {
     "/app": "app.html",
     "/admin": "admin.html"
   };
+  if (pathname.toLowerCase() === "/track.png") {
+    return serveFile(res, path.join(ROOT, "Track.png"), "image/png", "private, max-age=86400");
+  }
+  if (pathname.toLowerCase() === "/track_notext.png") {
+    return serveFile(res, path.join(ROOT, "Track_notext.png"), "image/png", "private, max-age=86400");
+  }
   const normalized = routes[pathname] || pathname.replace(/^\/+/, "");
   const filePath = path.resolve(PUBLIC_DIR, normalized);
   if (!filePath.startsWith(PUBLIC_DIR)) {
@@ -1004,18 +1060,26 @@ async function serveStatic(req, res, pathname) {
     if (!stat.isFile()) {
       return sendText(res, 404, "Not found");
     }
-    res.writeHead(200, {
-      "Content-Type": staticContentType(path.extname(filePath)),
-      "Content-Length": stat.size,
-      "Cache-Control": filePath.endsWith(".html") ? "no-cache" : "private, max-age=3600"
-    });
-    fs.createReadStream(filePath).pipe(res);
+    return serveFile(res, filePath, staticContentType(path.extname(filePath)), staticCacheControl(filePath), stat);
   } catch (error) {
     if (error.code === "ENOENT") {
       return sendText(res, 404, "Not found");
     }
     throw error;
   }
+}
+
+async function serveFile(res, filePath, contentType, cacheControl, existingStat) {
+  const stat = existingStat || await fsp.stat(filePath);
+  if (!stat.isFile()) {
+    return sendText(res, 404, "Not found");
+  }
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Content-Length": stat.size,
+    "Cache-Control": cacheControl
+  });
+  fs.createReadStream(filePath).pipe(res);
 }
 
 function staticContentType(ext) {
@@ -1030,6 +1094,14 @@ function staticContentType(ext) {
     ".jpeg": "image/jpeg",
     ".webmanifest": "application/manifest+json; charset=utf-8"
   }[ext.toLowerCase()] || "application/octet-stream";
+}
+
+function staticCacheControl(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if ([".html", ".css", ".js", ".webmanifest"].includes(ext)) {
+    return "no-cache";
+  }
+  return "private, max-age=3600";
 }
 
 async function readBody(req) {

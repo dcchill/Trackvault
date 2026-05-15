@@ -9,6 +9,10 @@ It runs on built-in Node.js APIs and stores local state in `.trackvault/`.
 
 ## Run
 
+On Windows, double-click `Start TrackVault.bat`. It starts the server and opens the player UI.
+
+Or run it from PowerShell:
+
 ```powershell
 npm start
 ```

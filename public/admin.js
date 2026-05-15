@@ -4,6 +4,9 @@ const nodes = {
   libraryPath: document.querySelector("#library-path"),
   scanOnStart: document.querySelector("#scan-on-start"),
   scanButton: document.querySelector("#scan-button"),
+  clearLibraryButton: document.querySelector("#clear-library-button"),
+  clearPlaylistsButton: document.querySelector("#clear-playlists-button"),
+  shutdownButton: document.querySelector("#shutdown-button"),
   message: document.querySelector("#admin-message"),
   scanStatus: document.querySelector("#scan-status"),
   tracks: document.querySelector("#metric-tracks"),
@@ -48,6 +51,54 @@ nodes.scanButton.addEventListener("click", async () => {
     setMessage(error.message, true);
   } finally {
     nodes.scanButton.disabled = false;
+  }
+});
+
+nodes.clearLibraryButton.addEventListener("click", async () => {
+  const confirmed = window.confirm("Clear library.json? This removes the current library index until you scan again.");
+  if (!confirmed) return;
+
+  nodes.clearLibraryButton.disabled = true;
+  setMessage("Clearing library.json");
+  try {
+    await api("/api/library/clear", { method: "POST" });
+    setMessage("library.json cleared");
+    await load();
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    nodes.clearLibraryButton.disabled = false;
+  }
+});
+
+nodes.clearPlaylistsButton.addEventListener("click", async () => {
+  const confirmed = window.confirm("Clear playlists.json? This deletes all playlists.");
+  if (!confirmed) return;
+
+  nodes.clearPlaylistsButton.disabled = true;
+  setMessage("Clearing playlists.json");
+  try {
+    await api("/api/playlists/clear", { method: "POST" });
+    setMessage("playlists.json cleared");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    nodes.clearPlaylistsButton.disabled = false;
+  }
+});
+
+nodes.shutdownButton.addEventListener("click", async () => {
+  const confirmed = window.confirm("Shut down TrackVault now?");
+  if (!confirmed) return;
+
+  nodes.shutdownButton.disabled = true;
+  setMessage("Shutting down TrackVault");
+  try {
+    await api("/api/shutdown", { method: "POST" });
+    setMessage("TrackVault has stopped. Close this tab or start it again when ready.");
+  } catch (error) {
+    setMessage(error.message, true);
+    nodes.shutdownButton.disabled = false;
   }
 });
 
