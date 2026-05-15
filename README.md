@@ -11,6 +11,8 @@ TrackVault is a self-hosted music server, meaning no ads and you control your mu
 
 It runs on built-in Node.js APIs and stores local state in `.trackvault/`.
 
+The first time you open `/admin`, TrackVault asks you to create an admin password. After that, admin settings, library scans, library resets, playlist resets, and shutdown require login.
+
 ## Help keep TrackVault free
 
 I want to keep TrackVault always free and open source.  Feel free to support my work, anything helps!  Of course it is not required so do not feel like you have to.

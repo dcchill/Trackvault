@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -193,6 +197,17 @@ p {
   color: var(--danger);
 }
 
+.auth-shell {
+  display: grid;
+  min-height: calc(100vh - 72px);
+  place-items: center;
+  padding: clamp(18px, 5vw, 48px);
+}
+
+.auth-panel {
+  width: min(460px, 100%);
+}
+
 .status-pill {
   display: inline-flex;
   min-height: 30px;
@@ -238,6 +253,7 @@ p {
 }
 
 .settings-form input[type="text"],
+.settings-form input[type="password"],
 .search-shell input {
   width: 100%;
   min-height: 42px;

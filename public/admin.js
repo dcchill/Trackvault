@@ -1,4 +1,14 @@
 const nodes = {
+  authView: document.querySelector("#auth-view"),
+  adminView: document.querySelector("#admin-view"),
+  authForm: document.querySelector("#auth-form"),
+  authTitle: document.querySelector("#auth-title"),
+  authCopy: document.querySelector("#auth-copy"),
+  authSubmit: document.querySelector("#auth-submit"),
+  authPassword: document.querySelector("#admin-password"),
+  authPasswordConfirm: document.querySelector("#admin-password-confirm"),
+  confirmPasswordRow: document.querySelector("#confirm-password-row"),
+  authMessage: document.querySelector("#auth-message"),
   form: document.querySelector("#settings-form"),
   serverName: document.querySelector("#server-name"),
   libraryPath: document.querySelector("#library-path"),
@@ -7,6 +17,7 @@ const nodes = {
   clearLibraryButton: document.querySelector("#clear-library-button"),
   clearPlaylistsButton: document.querySelector("#clear-playlists-button"),
   shutdownButton: document.querySelector("#shutdown-button"),
+  logoutButton: document.querySelector("#logout-button"),
   message: document.querySelector("#admin-message"),
   scanStatus: document.querySelector("#scan-status"),
   tracks: document.querySelector("#metric-tracks"),
@@ -18,6 +29,47 @@ const nodes = {
   albumPreview: document.querySelector("#album-preview"),
   trackPreview: document.querySelector("#track-preview")
 };
+
+let authMode = "login";
+
+nodes.authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const password = nodes.authPassword.value;
+  const confirmPassword = nodes.authPasswordConfirm.value;
+
+  if (authMode === "setup" && password !== confirmPassword) {
+    setAuthMessage("Passwords do not match", true);
+    return;
+  }
+
+  nodes.authSubmit.disabled = true;
+  setAuthMessage(authMode === "setup" ? "Creating admin password" : "Logging in");
+  try {
+    await api(authMode === "setup" ? "/api/admin/setup" : "/api/admin/login", {
+      method: "POST",
+      body: { password }
+    });
+    nodes.authPassword.value = "";
+    nodes.authPasswordConfirm.value = "";
+    await showAdmin();
+  } catch (error) {
+    setAuthMessage(error.message, true);
+  } finally {
+    nodes.authSubmit.disabled = false;
+  }
+});
+
+nodes.logoutButton.addEventListener("click", async () => {
+  nodes.logoutButton.disabled = true;
+  try {
+    await api("/api/admin/logout", { method: "POST" });
+  } catch {
+    // Still return to the login screen if the server has already cleared the session.
+  } finally {
+    nodes.logoutButton.disabled = false;
+    await showAuth();
+  }
+});
 
 nodes.form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -102,7 +154,49 @@ nodes.shutdownButton.addEventListener("click", async () => {
   }
 });
 
-load();
+init();
+
+async function init() {
+  try {
+    const auth = await api("/api/admin/auth");
+    if (auth.authenticated) {
+      await showAdmin();
+      return;
+    }
+    renderAuth(auth);
+  } catch (error) {
+    renderAuth({ configured: true, authenticated: false });
+    setAuthMessage(error.message, true);
+  }
+}
+
+async function showAdmin() {
+  nodes.authView.hidden = true;
+  nodes.adminView.hidden = false;
+  nodes.logoutButton.hidden = false;
+  await load();
+}
+
+async function showAuth() {
+  nodes.adminView.hidden = true;
+  nodes.logoutButton.hidden = true;
+  const auth = await api("/api/admin/auth").catch(() => ({ configured: true, authenticated: false }));
+  renderAuth(auth);
+}
+
+function renderAuth(auth) {
+  authMode = auth.configured ? "login" : "setup";
+  nodes.authTitle.textContent = auth.configured ? "Admin Login" : "Create Admin Password";
+  nodes.authCopy.textContent = auth.configured
+    ? "Enter the admin password to manage TrackVault."
+    : "Create the password used to manage server settings, scans, library resets, and shutdown.";
+  nodes.authSubmit.textContent = auth.configured ? "Log In" : "Create Password";
+  nodes.authPassword.autocomplete = auth.configured ? "current-password" : "new-password";
+  nodes.confirmPasswordRow.hidden = auth.configured;
+  nodes.authPasswordConfirm.required = !auth.configured;
+  nodes.authView.hidden = false;
+  nodes.authPassword.focus();
+}
 
 async function load() {
   const status = await api("/api/status");
@@ -168,6 +262,7 @@ function renderTracks(tracks) {
 async function api(url, options = {}) {
   const response = await fetch(url, {
     method: options.method || "GET",
+    credentials: "same-origin",
     headers: options.body ? { "Content-Type": "application/json" } : undefined,
     body: options.body ? JSON.stringify(options.body) : undefined
   });
@@ -181,6 +276,11 @@ async function api(url, options = {}) {
 function setMessage(value, isError = false) {
   nodes.message.textContent = value;
   nodes.message.classList.toggle("error", isError);
+}
+
+function setAuthMessage(value, isError = false) {
+  nodes.authMessage.textContent = value;
+  nodes.authMessage.classList.toggle("error", isError);
 }
 
 function number(value) {

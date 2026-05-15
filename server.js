@@ -14,6 +14,8 @@ const LIBRARY_FILE = path.join(DATA_DIR, "library.json");
 const FAVORITES_FILE = path.join(DATA_DIR, "favorites.json");
 const PLAYLISTS_FILE = path.join(DATA_DIR, "playlists.json");
 const PUBLIC_DIR = path.join(ROOT, "public");
+const ADMIN_SESSION_COOKIE = "trackvault_admin";
+const ADMIN_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 const AUDIO_EXTENSIONS = new Set([".mp3", ".flac", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".webm"]);
 const TEXT_FRAME_IDS = {
@@ -31,6 +33,7 @@ let library = emptyLibrary();
 let favorites = { tracks: [] };
 let playlists = [];
 let httpServer = null;
+let adminSessions = new Map();
 let scanState = {
   active: false,
   startedAt: null,
@@ -64,6 +67,10 @@ async function main() {
 
   if (process.env.TRACKVAULT_LIBRARY && !settings.libraryPath) {
     settings.libraryPath = resolveUserPath(process.env.TRACKVAULT_LIBRARY);
+    await writeJson(SETTINGS_FILE, settings);
+  }
+  if (process.env.TRACKVAULT_ADMIN_PASSWORD && !settings.adminPasswordHash) {
+    settings.adminPasswordHash = await hashPassword(process.env.TRACKVAULT_ADMIN_PASSWORD);
     await writeJson(SETTINGS_FILE, settings);
   }
 
@@ -138,6 +145,26 @@ async function handleRequest(req, res) {
 }
 
 async function handleApi(req, res, url) {
+  if (req.method === "GET" && url.pathname === "/api/admin/auth") {
+    return sendJson(res, 200, adminAuthPayload(req));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/setup") {
+    return setupAdmin(req, res);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/login") {
+    return loginAdmin(req, res);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/logout") {
+    return logoutAdmin(req, res);
+  }
+
+  if (isAdminApiRequest(req, url) && !isAdminAuthenticated(req)) {
+    return sendJson(res, 401, { error: "Admin login required" });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/status") {
     return sendJson(res, 200, statusPayload());
   }
@@ -273,6 +300,154 @@ async function handleApi(req, res, url) {
   }
 
   return sendJson(res, 404, { error: "Not found" });
+}
+
+function adminAuthPayload(req) {
+  return {
+    configured: Boolean(settings.adminPasswordHash),
+    authenticated: isAdminAuthenticated(req)
+  };
+}
+
+async function setupAdmin(req, res) {
+  if (settings.adminPasswordHash) {
+    return sendJson(res, 409, { error: "Admin password is already configured" });
+  }
+
+  const body = await readBody(req);
+  const password = validateAdminPassword(body.password);
+  if (!password.ok) {
+    return sendJson(res, 400, { error: password.error });
+  }
+
+  settings.adminPasswordHash = await hashPassword(password.value);
+  await writeJson(SETTINGS_FILE, settings);
+  return createAdminSession(res);
+}
+
+async function loginAdmin(req, res) {
+  if (!settings.adminPasswordHash) {
+    return sendJson(res, 409, { error: "Create an admin password first" });
+  }
+
+  const body = await readBody(req);
+  const password = String(body.password || "");
+  if (!password || !(await verifyPassword(password, settings.adminPasswordHash))) {
+    return sendJson(res, 401, { error: "Invalid admin password" });
+  }
+
+  return createAdminSession(res);
+}
+
+function logoutAdmin(req, res) {
+  const sessionId = getCookie(req, ADMIN_SESSION_COOKIE);
+  if (sessionId) {
+    adminSessions.delete(sessionId);
+  }
+  return sendJson(res, 200, { ok: true }, {
+    "Set-Cookie": `${ADMIN_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+  });
+}
+
+function createAdminSession(res) {
+  pruneAdminSessions();
+  const sessionId = crypto.randomBytes(32).toString("hex");
+  const expiresAt = Date.now() + ADMIN_SESSION_MAX_AGE * 1000;
+  adminSessions.set(sessionId, expiresAt);
+  return sendJson(res, 200, { ok: true, configured: true, authenticated: true }, {
+    "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ADMIN_SESSION_MAX_AGE}`
+  });
+}
+
+function isAdminApiRequest(req, url) {
+  if (url.pathname === "/api/settings") {
+    return true;
+  }
+  return req.method === "POST" && [
+    "/api/scan",
+    "/api/library/clear",
+    "/api/playlists/clear",
+    "/api/shutdown"
+  ].includes(url.pathname);
+}
+
+function isAdminAuthenticated(req) {
+  const sessionId = getCookie(req, ADMIN_SESSION_COOKIE);
+  if (!sessionId) {
+    return false;
+  }
+  const expiresAt = adminSessions.get(sessionId);
+  if (!expiresAt || expiresAt <= Date.now()) {
+    adminSessions.delete(sessionId);
+    return false;
+  }
+  return true;
+}
+
+function pruneAdminSessions() {
+  const now = Date.now();
+  for (const [sessionId, expiresAt] of adminSessions) {
+    if (expiresAt <= now) {
+      adminSessions.delete(sessionId);
+    }
+  }
+}
+
+function getCookie(req, name) {
+  const cookies = parseCookies(req.headers.cookie || "");
+  return cookies[name] || "";
+}
+
+function parseCookies(header) {
+  const cookies = {};
+  for (const item of header.split(";")) {
+    const [rawName, ...rawValue] = item.trim().split("=");
+    if (!rawName) {
+      continue;
+    }
+    cookies[rawName] = decodeURIComponent(rawValue.join("=") || "");
+  }
+  return cookies;
+}
+
+function validateAdminPassword(value) {
+  const password = String(value || "");
+  if (password.length < 6) {
+    return { ok: false, error: "Password must be at least 6 characters" };
+  }
+  return { ok: true, value: password };
+}
+
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const key = await scrypt(password, salt);
+  return `scrypt:${salt}:${key.toString("hex")}`;
+}
+
+async function verifyPassword(password, storedHash) {
+  const parts = String(storedHash || "").split(":");
+  if (parts.length !== 3 || parts[0] !== "scrypt") {
+    return false;
+  }
+  const [, salt, hashHex] = parts;
+  const actual = await scrypt(password, salt);
+  const expected = Buffer.from(hashHex, "hex");
+  if (actual.length !== expected.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(actual, expected);
+}
+
+function scrypt(password, salt) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(derivedKey);
+    });
+  });
 }
 
 async function runScan(res) {
@@ -1116,11 +1291,12 @@ async function readBody(req) {
   return JSON.parse(raw);
 }
 
-function sendJson(res, status, payload) {
+function sendJson(res, status, payload, headers = {}) {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body)
+    "Content-Length": Buffer.byteLength(body),
+    ...headers
   });
   res.end(body);
 }

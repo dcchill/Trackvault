@@ -19,10 +19,32 @@
       </a>
       <nav class="topbar-actions" aria-label="Primary">
         <a class="button secondary" href="/app">Open Player</a>
+        <button id="logout-button" class="button secondary" type="button" hidden>Log Out</button>
       </nav>
     </header>
 
-    <main class="admin-grid">
+    <main id="auth-view" class="auth-shell" hidden>
+      <section class="panel auth-panel" aria-labelledby="auth-title">
+        <div class="section-heading">
+          <h1 id="auth-title">Admin Login</h1>
+        </div>
+        <form id="auth-form" class="settings-form">
+          <p id="auth-copy" class="muted">Enter the admin password to manage TrackVault.</p>
+          <label>
+            <span>Password</span>
+            <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <label id="confirm-password-row" hidden>
+            <span>Confirm password</span>
+            <input id="admin-password-confirm" name="confirmPassword" type="password" autocomplete="new-password">
+          </label>
+          <button id="auth-submit" class="button accent" type="submit">Log In</button>
+        </form>
+        <div id="auth-message" class="message" role="status" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <main id="admin-view" class="admin-grid" hidden>
       <section class="panel settings-panel" aria-labelledby="settings-title">
         <div class="section-heading">
           <h1 id="settings-title">Server</h1>
