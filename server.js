@@ -11,13 +11,13 @@ const PORT = Number(process.env.PORT || 8096);
 const DATA_DIR = path.resolve(process.env.TRACKVAULT_DATA || path.join(ROOT, ".trackvault"));
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 const LIBRARY_FILE = path.join(DATA_DIR, "library.json");
-const FAVORITES_FILE = path.join(DATA_DIR, "favorites.json");
 const PLAYLISTS_FILE = path.join(DATA_DIR, "playlists.json");
+const SHARES_FILE = path.join(DATA_DIR, "shares.json");
 const PUBLIC_DIR = path.join(ROOT, "public");
 const ADMIN_SESSION_COOKIE = "trackvault_admin";
 const ADMIN_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
-const AUDIO_EXTENSIONS = new Set([".mp3", ".flac", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".webm"]);
+const AUDIO_EXTENSIONS = new Set([".mp3", ".flac", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".webm", ".aif", ".aiff", ".ape", ".wv"]);
 const TEXT_FRAME_IDS = {
   TIT2: "title",
   TPE1: "artist",
@@ -30,9 +30,10 @@ const TEXT_FRAME_IDS = {
 
 let settings = {};
 let library = emptyLibrary();
-let favorites = { tracks: [] };
 let playlists = [];
+let shares = [];
 let httpServer = null;
+let embedder = null;
 let adminSessions = new Map();
 let scanState = {
   active: false,
@@ -62,8 +63,17 @@ async function main() {
   await ensureDataFiles();
   settings = await readJson(SETTINGS_FILE, defaultSettings());
   library = await readJson(LIBRARY_FILE, emptyLibrary());
-  favorites = await readJson(FAVORITES_FILE, { tracks: [] });
+  if (!library || typeof library !== "object") library = emptyLibrary();
+  if (!Array.isArray(library.tracks)) library.tracks = [];
+  if (!Array.isArray(library.albums)) library.albums = [];
+  if (!Array.isArray(library.artists)) library.artists = [];
+  if (!Array.isArray(library.genres)) library.genres = [];
+
   playlists = await readJson(PLAYLISTS_FILE, []);
+  if (!Array.isArray(playlists)) playlists = [];
+  
+  shares = await readJson(SHARES_FILE, []);
+  if (!Array.isArray(shares)) shares = [];
 
   if (process.env.TRACKVAULT_LIBRARY && !settings.libraryPath) {
     settings.libraryPath = resolveUserPath(process.env.TRACKVAULT_LIBRARY);
@@ -133,6 +143,10 @@ async function handleRequest(req, res) {
       return redirect(res, "/app");
     }
 
+    if (url.pathname.startsWith("/share/")) {
+      return serveStatic(req, res, "/share.html");
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return handleApi(req, res, url);
     }
@@ -163,6 +177,12 @@ async function handleApi(req, res, url) {
 
   if (isAdminApiRequest(req, url) && !isAdminAuthenticated(req)) {
     return sendJson(res, 401, { error: "Admin login required" });
+  }
+
+  if (req.method === "POST" && isAdminPasswordResetPath(url.pathname)) {
+    settings.adminPasswordHash = null;
+    await writeJson(SETTINGS_FILE, settings);
+    return logoutAdmin(req, res);
   }
 
   if (req.method === "GET" && url.pathname === "/api/status") {
@@ -204,26 +224,6 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/library") {
     return sendJson(res, 200, filteredLibrary(url.searchParams));
-  }
-
-  if (req.method === "GET" && url.pathname === "/api/favorites") {
-    return sendJson(res, 200, { tracks: favorites.tracks });
-  }
-
-  const favoriteMatch = url.pathname.match(/^\/api\/favorites\/([^/]+)$/);
-  if (favoriteMatch && req.method === "POST") {
-    const trackId = decodeURIComponent(favoriteMatch[1]);
-    const body = await readBody(req);
-    const set = new Set(favorites.tracks);
-    const nextValue = typeof body.favorite === "boolean" ? body.favorite : !set.has(trackId);
-    if (nextValue) {
-      set.add(trackId);
-    } else {
-      set.delete(trackId);
-    }
-    favorites.tracks = Array.from(set);
-    await writeJson(FAVORITES_FILE, favorites);
-    return sendJson(res, 200, { trackId, favorite: nextValue, tracks: favorites.tracks });
   }
 
   if (req.method === "GET" && url.pathname === "/api/playlists") {
@@ -299,6 +299,25 @@ async function handleApi(req, res, url) {
     return serveAlbumArt(res, decodeURIComponent(albumArtMatch[1]));
   }
 
+  // Public/Semantic AI Endpoints
+  if (req.method === "GET" && url.pathname === "/api/library/semantic") {
+    return handleSemanticSearch(req, res, url.searchParams);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/shares") {
+    return createShare(req, res);
+  }
+
+  const publicShareMatch = url.pathname.match(/^\/api\/public\/shares\/([^/]+)$/);
+  if (publicShareMatch && req.method === "GET") {
+    return getPublicShare(res, publicShareMatch[1]);
+  }
+
+  const publicStreamMatch = url.pathname.match(/^\/api\/public\/stream\/([^/]+)$/);
+  if (publicStreamMatch && req.method === "GET") {
+    return streamPublicShare(req, res, publicStreamMatch[1]);
+  }
+
   return sendJson(res, 404, { error: "Not found" });
 }
 
@@ -363,12 +382,19 @@ function isAdminApiRequest(req, url) {
   if (url.pathname === "/api/settings") {
     return true;
   }
-  return req.method === "POST" && [
+  if (req.method !== "POST") {
+    return false;
+  }
+  return isAdminPasswordResetPath(url.pathname) || [
     "/api/scan",
     "/api/library/clear",
     "/api/playlists/clear",
     "/api/shutdown"
   ].includes(url.pathname);
+}
+
+function isAdminPasswordResetPath(pathname) {
+  return pathname === "/api/admin/remove-password" || pathname === "/api/admin/reset-password";
 }
 
 function isAdminAuthenticated(req) {
@@ -391,6 +417,125 @@ function pruneAdminSessions() {
       adminSessions.delete(sessionId);
     }
   }
+}
+
+async function createShare(req, res) {
+  const body = await readBody(req);
+  const { trackId, playlistId, albumId, expiresDays } = body;
+  
+  if (!trackId && !playlistId && !albumId) {
+    return sendJson(res, 400, { error: "trackId, playlistId, or albumId is required" });
+  }
+
+  const token = crypto.randomBytes(16).toString("hex");
+  const share = {
+    token,
+    trackId,
+    playlistId,
+    albumId,
+    createdAt: new Date().toISOString(),
+    expiresAt: expiresDays ? new Date(Date.now() + expiresDays * 24 * 60 * 60 * 1000).toISOString() : null
+  };
+
+  shares.push(share);
+  await writeJson(SHARES_FILE, shares);
+
+  return sendJson(res, 201, { token, url: `/share/${token}` });
+}
+
+function getPublicShare(res, token) {
+  const share = shares.find(s => s.token === token);
+  if (!share) return sendJson(res, 404, { error: "Share not found" });
+
+  if (share.expiresAt && new Date(share.expiresAt) < new Date()) {
+    return sendJson(res, 410, { error: "Share expired" });
+  }
+
+  if (share.trackId) {
+    const track = trackById(share.trackId);
+    if (!track) return sendJson(res, 404, { error: "Track missing" });
+    return sendJson(res, 200, { type: "track", track: publicTrack(track) });
+  }
+
+  if (share.playlistId) {
+    const playlist = playlists.find(p => p.id === share.playlistId);
+    if (!playlist) return sendJson(res, 404, { error: "Playlist missing" });
+    const tracks = playlist.trackIds.map(trackById).filter(Boolean).map(publicTrack);
+    return sendJson(res, 200, { type: "playlist", playlist: publicPlaylist(playlist), tracks });
+  }
+
+  if (share.albumId) {
+    const album = library.albums.find(a => a.id === share.albumId);
+    if (!album) return sendJson(res, 404, { error: "Album missing" });
+    const tracks = album.trackIds.map(trackById).filter(Boolean).map(publicTrack);
+    return sendJson(res, 200, { type: "album", album: publicAlbum(album), tracks });
+  }
+
+  return sendJson(res, 400, { error: "Invalid share" });
+}
+
+async function streamPublicShare(req, res, token) {
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const trackIdParam = url.searchParams.get("trackId");
+  const share = shares.find(s => s.token === token);
+  if (!share) return sendJson(res, 404, { error: "Not found" });
+
+  if (share.expiresAt && new Date(share.expiresAt) < new Date()) {
+    return sendJson(res, 410, { error: "Expired" });
+  }
+
+  let finalTrackId = share.trackId;
+  if (share.playlistId || share.albumId) {
+    finalTrackId = trackIdParam;
+  }
+
+  if (!finalTrackId) return sendJson(res, 400, { error: "trackId required" });
+  return streamTrack(req, res, finalTrackId);
+}
+
+async function getEmbedder() {
+  if (!embedder) {
+    const { pipeline } = await import("@xenova/transformers");
+    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+  }
+  return embedder;
+}
+
+async function handleSemanticSearch(req, res, searchParams) {
+  const query = searchParams.get("q");
+  if (!query) return sendJson(res, 400, { error: "Query required" });
+
+  try {
+    const extractor = await getEmbedder();
+    const output = await extractor(query, { pooling: "mean", normalize: true });
+    const queryVector = Array.from(output.data);
+
+    const results = library.tracks
+      .filter(t => t.embedding)
+      .map(track => ({
+        track: publicTrack(track),
+        score: cosineSimilarity(queryVector, track.embedding)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 50);
+
+    return sendJson(res, 200, { results });
+  } catch (error) {
+    console.error("Semantic search error:", error);
+    return sendJson(res, 500, { error: "Search failed" });
+  }
+}
+
+function cosineSimilarity(v1, v2) {
+  return dotProduct(v1, v2) / (magnitude(v1) * magnitude(v2));
+}
+
+function dotProduct(v1, v2) {
+  return v1.reduce((sum, val, i) => sum + val * v2[i], 0);
+}
+
+function magnitude(v) {
+  return Math.sqrt(v.reduce((sum, val) => sum + val * val, 0));
 }
 
 function getCookie(req, name) {
@@ -495,6 +640,20 @@ async function performScan() {
 
   try {
     const nextLibrary = await scanLibrary(settings.libraryPath);
+    
+    // Generate embeddings for new or changed tracks
+    const extractor = await getEmbedder();
+    for (const track of nextLibrary.tracks) {
+      const existing = library.tracks.find(t => t.id === track.id && t.mtimeMs === track.mtimeMs && t.embedding);
+      if (existing) {
+        track.embedding = existing.embedding;
+      } else {
+        const text = `${track.title} ${track.artist} ${track.album} ${track.genre}`.trim();
+        const output = await extractor(text, { pooling: "mean", normalize: true });
+        track.embedding = Array.from(output.data);
+      }
+    }
+
     library = nextLibrary;
     await writeJson(LIBRARY_FILE, library);
     scanState = { ...scanState, active: false, finishedAt: new Date().toISOString() };
@@ -631,7 +790,7 @@ function metadataFromPath(relativePath) {
 
 async function readEmbeddedMetadata(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext === ".mp3") {
+  if (ext === ".mp3" || ext === ".aif" || ext === ".aiff") {
     return {
       ...(await readId3v1(filePath)),
       ...(await readId3v2(filePath))
@@ -857,14 +1016,11 @@ function filteredLibrary(searchParams) {
   const artistId = searchParams.get("artistId");
   const albumId = searchParams.get("albumId");
   const genre = normalize(searchParams.get("genre") || "");
-  const favoriteOnly = searchParams.get("favorite") === "true";
-  const favoriteSet = new Set(favorites.tracks);
 
-  const tracks = library.tracks.filter((track) => {
+  const tracks = (library.tracks || []).filter((track) => {
     if (artistId && track.artistId !== artistId) return false;
     if (albumId && track.albumId !== albumId) return false;
     if (genre && normalize(track.genre) !== genre) return false;
-    if (favoriteOnly && !favoriteSet.has(track.id)) return false;
     if (!query) return true;
     return [track.title, track.artist, track.album, track.genre].some((value) => normalize(value).includes(query));
   });
@@ -875,9 +1031,9 @@ function filteredLibrary(searchParams) {
   return {
     ...statusPayload(),
     tracks: tracks.map(publicTrack),
-    albums: library.albums.filter((album) => trackAlbumIds.has(album.id)).map(publicAlbum),
-    artists: library.artists.filter((artist) => trackArtistIds.has(artist.id)).map(publicArtist),
-    genres: library.genres
+    albums: (library.albums || []).filter((album) => trackAlbumIds.has(album.id)).map(publicAlbum),
+    artists: (library.artists || []).filter((artist) => trackArtistIds.has(artist.id)).map(publicArtist),
+    genres: library.genres || []
   };
 }
 
@@ -891,9 +1047,6 @@ function statusPayload() {
       genres: library.genres
     },
     scan: scanState,
-    favorites: {
-      count: favorites.tracks.length
-    },
     playlists: {
       count: playlists.length
     }
@@ -1046,7 +1199,7 @@ async function serveAlbumArt(res, albumId) {
 
 async function readEmbeddedArt(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext === ".mp3") {
+  if (ext === ".mp3" || ext === ".aif" || ext === ".aiff") {
     return readId3Art(filePath);
   }
   if (ext === ".flac") {
@@ -1210,14 +1363,20 @@ function audioContentType(extension) {
     aac: "audio/aac",
     ogg: "audio/ogg",
     opus: "audio/ogg",
-    webm: "audio/webm"
+    webm: "audio/webm",
+    aif: "audio/x-aiff",
+    aiff: "audio/x-aiff",
+    ape: "audio/x-ape",
+    wv: "audio/wavpack"
   }[extension] || "application/octet-stream";
 }
 
 async function serveStatic(req, res, pathname) {
   const routes = {
     "/app": "app.html",
-    "/admin": "admin.html"
+    "/app/": "app.html",
+    "/admin": "admin.html",
+    "/admin/": "admin.html"
   };
   if (pathname.toLowerCase() === "/track.png") {
     return serveFile(res, path.join(ROOT, "Track.png"), "image/png", "private, max-age=86400");

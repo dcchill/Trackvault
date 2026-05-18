@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shared with TrackVault</title>
+    <link rel="icon" href="/track_notext.png">
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+      :root {
+        --bg-main: #0a0a0a;
+        --bg-panel: #1a1a1a;
+        --accent-main: #ff8848;
+        --text-main: #ffffff;
+        --text-muted: #a0a0a0;
+      }
+      .share-page {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: var(--bg-main);
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-main);
+      }
+      .share-card {
+        background: var(--bg-panel);
+        border-radius: 1.5rem;
+        padding: 3rem;
+        box-shadow: 0 1rem 3rem rgba(0,0,0,0.6);
+        max-width: 600px;
+        width: 100%;
+        border: 1px solid #333;
+      }
+      .share-art {
+        width: 280px;
+        height: 280px;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+        object-fit: cover;
+        box-shadow: 0 0.5rem 2rem rgba(255,136,72,0.2);
+      }
+      .share-title {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        color: var(--accent-main);
+      }
+      .share-subtitle {
+        font-size: 1.25rem;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+      }
+      .share-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: center;
+      }
+      .share-progress {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      .share-player-toggle {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        font-size: 1.5rem;
+        background: var(--accent-main);
+        color: #000;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+        transition: transform 0.2s;
+      }
+      .share-player-toggle:hover {
+        transform: scale(1.05);
+      }
+      .share-list {
+        margin-top: 2rem;
+        text-align: left;
+        width: 100%;
+        max-height: 300px;
+        overflow-y: auto;
+        border-top: 1px solid #333;
+        padding-top: 1rem;
+      }
+      .share-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid #222;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      .share-item:hover {
+        background: #222;
+      }
+      .share-item.active {
+        color: var(--accent-main);
+      }
+      .error-message {
+        color: var(--accent-main);
+        font-size: 1.5rem;
+      }
+      input[type="range"] {
+        accent-color: var(--accent-main);
+      }
+    </style>
+  </head>
+  <body class="share-page">
+    <div id="loading" class="muted">Loading share...</div>
+    <div id="error" class="error-message" style="display: none;"></div>
+    
+    <div id="content" class="share-card" style="display: none;">
+      <img id="art" class="share-art" src="" alt="">
+      <h1 id="title" class="share-title"></h1>
+      <p id="subtitle" class="share-subtitle"></p>
+      
+      <div class="share-controls">
+        <div class="share-progress">
+          <span id="current-time">0:00</span>
+          <input id="seek-slider" class="seek-slider" type="range" min="0" max="1000" value="0" step="1" style="flex: 1;">
+          <span id="duration-time">0:00</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 2rem;">
+          <button id="prev-btn" class="button secondary" style="display: none;">Prev</button>
+          <button id="play-toggle" class="share-player-toggle" type="button">Play</button>
+          <button id="next-btn" class="button secondary" style="display: none;">Next</button>
+        </div>
+      </div>
+
+      <div id="track-list" class="share-list" style="display: none;"></div>
+    </div>
+
+    <footer style="margin-top: 3rem;">
+      <a href="/" class="brand" style="text-decoration: none;">
+        <img src="/track_notext.png" alt="" style="width: 32px; height: 32px;">
+        <span class="muted">Powered by TrackVault</span>
+      </a>
+    </footer>
+
+    <audio id="audio"></audio>
+    <script src="/share.js"></script>
+  </body>
+</html>

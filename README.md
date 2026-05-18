@@ -42,7 +42,7 @@ Optional environment variables:
 - `TRACKVAULT_LIBRARY`: initial music library path
 - `TRACKVAULT_DATA`: state directory, defaults to `.trackvault`
 
-Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg`, `.opus`, and `.webm`.
+Supported scan extensions include `.mp3`, `.flac`, `.m4a`, `.aac`, `.wav`, `.ogg`, `.opus`, `.webm`, `.aif`, `.aiff`, `.ape`, and `.wv`.
 
 ## TrueNAS SCALE
 

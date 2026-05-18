@@ -16,6 +16,7 @@ const nodes = {
   scanButton: document.querySelector("#scan-button"),
   clearLibraryButton: document.querySelector("#clear-library-button"),
   clearPlaylistsButton: document.querySelector("#clear-playlists-button"),
+  removePasswordButton: document.querySelector("#remove-password-button"),
   shutdownButton: document.querySelector("#shutdown-button"),
   logoutButton: document.querySelector("#logout-button"),
   message: document.querySelector("#admin-message"),
@@ -139,6 +140,22 @@ nodes.clearPlaylistsButton.addEventListener("click", async () => {
   }
 });
 
+nodes.removePasswordButton.addEventListener("click", async () => {
+  const confirmed = window.confirm("DANGER: Remove the admin password? You will be logged out and the server will return to setup mode.");
+  if (!confirmed) return;
+
+  nodes.removePasswordButton.disabled = true;
+  setMessage("Removing admin password");
+  try {
+    await api("/api/admin/remove-password", { method: "POST" });
+    setMessage("Admin password removed. Redirecting to setup...");
+    setTimeout(() => window.location.reload(), 1500);
+  } catch (error) {
+    setMessage(error.message, true);
+    nodes.removePasswordButton.disabled = false;
+  }
+});
+
 nodes.shutdownButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Shut down TrackVault now?");
   if (!confirmed) return;
@@ -208,11 +225,11 @@ async function load() {
 }
 
 function applyStatus(status) {
-  const settings = status.settings;
-  const library = status.library;
+  const settings = status.settings || {};
+  const library = status.library || {};
   const stats = library.stats || {};
 
-  document.title = `${settings.serverName} Admin`;
+  document.title = `${settings.serverName || "TrackVault"} Admin`;
   nodes.serverName.value = settings.serverName || "";
   nodes.libraryPath.value = settings.libraryPath || "";
   nodes.scanOnStart.checked = Boolean(settings.scanOnStart);
@@ -224,8 +241,8 @@ function applyStatus(status) {
   nodes.lastScan.textContent = library.generatedAt ? `Scanned ${formatDate(library.generatedAt)}` : "Never scanned";
   nodes.libraryRoot.textContent = library.root || settings.libraryPath || "";
 
-  nodes.scanStatus.textContent = status.scan.active ? "Scanning" : "Idle";
-  nodes.scanStatus.classList.toggle("busy", Boolean(status.scan.active));
+  nodes.scanStatus.textContent = status.scan?.active ? "Scanning" : "Idle";
+  nodes.scanStatus.classList.toggle("busy", Boolean(status.scan?.active));
 }
 
 function renderAlbums(albums) {

@@ -5,7 +5,6 @@ const state = {
   artists: [],
   genres: [],
   playlists: [],
-  favorites: new Set(),
   activeView: "tracks",
   selectedArtistId: "",
   selectedAlbumId: "",
@@ -33,6 +32,7 @@ const nodes = {
   queueList: document.querySelector("#queue-list"),
   playVisible: document.querySelector("#play-visible"),
   shuffleVisible: document.querySelector("#shuffle-visible"),
+  sharePlaylist: document.querySelector("#share-playlist"),
   bulkActions: document.querySelector("#bulk-actions"),
   selectVisible: document.querySelector("#select-visible"),
   selectedCount: document.querySelector("#selected-count"),
@@ -61,8 +61,22 @@ bindEvents();
 load();
 
 function bindEvents() {
-  nodes.search.addEventListener("input", () => {
+  nodes.search.addEventListener("input", async () => {
     state.search = nodes.search.value.trim().toLowerCase();
+    
+    // Semantic search if query is long enough and contains spaces (likely a phrase)
+    if (state.search.length > 10 && state.search.includes(" ")) {
+      try {
+        const result = await api(`/api/library/semantic?q=${encodeURIComponent(state.search)}`);
+        state.semanticResults = result.results;
+      } catch (err) {
+        console.warn("Semantic search failed", err);
+        state.semanticResults = null;
+      }
+    } else {
+      state.semanticResults = null;
+    }
+    
     render();
   });
 
@@ -122,7 +136,7 @@ function bindEvents() {
     render();
   });
 
-  nodes.albumGrid.addEventListener("click", (event) => {
+  nodes.albumGrid.addEventListener("click", async (event) => {
     const playButton = event.target.closest("button[data-play-album]");
     if (playButton) {
       const albumId = playButton.dataset.playAlbum;
@@ -136,6 +150,12 @@ function bindEvents() {
       state.activeView = "albums";
       state.selectedAlbumId = selectButton.dataset.selectAlbum;
       render();
+      return;
+    }
+
+    const shareButton = event.target.closest("button[data-share-album]");
+    if (shareButton) {
+      await shareAlbum(shareButton.dataset.shareAlbum);
     }
   });
 
@@ -153,15 +173,15 @@ function bindEvents() {
       return;
     }
 
-    const favoriteButton = event.target.closest("button[data-favorite-track]");
-    if (favoriteButton) {
-      await toggleFavorite(favoriteButton.dataset.favoriteTrack);
-      return;
-    }
-
     const removeButton = event.target.closest("button[data-remove-track]");
     if (removeButton) {
       await removeTrackFromSelectedPlaylist(removeButton.dataset.removeTrack);
+      return;
+    }
+
+    const shareButton = event.target.closest("button[data-share-track]");
+    if (shareButton) {
+      await shareTrack(shareButton.dataset.shareTrack);
     }
   });
 
@@ -208,6 +228,13 @@ function bindEvents() {
   nodes.shuffleVisible.addEventListener("click", () => {
     const tracks = shuffle(visibleTracks());
     playQueue(tracks, tracks[0]?.id);
+  });
+
+  nodes.sharePlaylist.addEventListener("click", async () => {
+    const playlistId = state.selectedPlaylistId;
+    if (playlistId) {
+      await sharePlaylist(playlistId);
+    }
   });
 
   nodes.clearQueue.addEventListener("click", () => {
@@ -271,18 +298,16 @@ function bindEvents() {
 }
 
 async function load() {
-  const [library, favorites, playlists] = await Promise.all([
+  const [library, playlists] = await Promise.all([
     api("/api/library"),
-    api("/api/favorites"),
     api("/api/playlists")
   ]);
 
-  state.serverName = library.settings.serverName || "TrackVault";
-  state.tracks = sortedTracks(library.tracks);
-  state.albums = library.albums;
-  state.artists = library.artists;
-  state.genres = library.genres;
-  state.favorites = new Set(favorites.tracks || []);
+  state.serverName = library.settings?.serverName || "TrackVault";
+  state.tracks = sortedTracks(library.tracks || []);
+  state.albums = library.albums || [];
+  state.artists = library.artists || [];
+  state.genres = library.genres || [];
   state.playlists = playlists.playlists || [];
 
   document.title = state.serverName;
@@ -305,21 +330,21 @@ function renderViewButtons() {
 }
 
 function renderNavigation() {
-  nodes.playlistNavList.innerHTML = state.playlists.map((playlist) => `
+  nodes.playlistNavList.innerHTML = (state.playlists || []).map((playlist) => `
     <button type="button" class="${playlist.id === state.selectedPlaylistId ? "active" : ""}" data-playlist-id="${playlist.id}">
       <span title="${escapeHtml(playlist.name)}">${escapeHtml(playlist.name)}</span>
       <em>${number(playlist.trackCount)}</em>
     </button>
   `).join("") || `<div class="empty-state compact">No playlists</div>`;
 
-  nodes.artistList.innerHTML = state.artists.map((artist) => `
+  nodes.artistList.innerHTML = (state.artists || []).map((artist) => `
     <button type="button" class="${artist.id === state.selectedArtistId ? "active" : ""}" data-artist-id="${artist.id}">
       <span title="${escapeHtml(artist.name)}">${escapeHtml(artist.name)}</span>
       <em>${artist.albumCount}</em>
     </button>
   `).join("") || `<div class="empty-state">No artists</div>`;
 
-  nodes.genreList.innerHTML = state.genres.map((genre) => `
+  nodes.genreList.innerHTML = (state.genres || []).map((genre) => `
     <button type="button" class="${genre === state.selectedGenre ? "active" : ""}" data-genre="${escapeHtml(genre)}">
       <span title="${escapeHtml(genre)}">${escapeHtml(genre)}</span>
     </button>
@@ -335,13 +360,14 @@ function renderLibrary() {
   nodes.meta.textContent = `${number(tracks.length)} tracks - ${number(albums.length)} albums`;
   nodes.playVisible.disabled = tracks.length === 0;
   nodes.shuffleVisible.disabled = tracks.length === 0;
+  nodes.sharePlaylist.hidden = state.activeView !== "playlists" || !state.selectedPlaylistId;
 
   renderAlbums(albums);
   renderTracks(tracks);
 }
 
 function renderAlbums(albums) {
-  const shouldShowAlbums = state.activeView !== "favorites" && state.activeView !== "playlists";
+  const shouldShowAlbums = state.activeView !== "playlists";
   if (!shouldShowAlbums) {
     nodes.albumGrid.innerHTML = "";
     return;
@@ -361,6 +387,7 @@ function renderAlbums(albums) {
       <div class="album-actions">
         <button class="button secondary" type="button" data-select-album="${album.id}">Open</button>
         <button class="icon-button" type="button" data-play-album="${album.id}" aria-label="Play ${escapeHtml(album.title)}">&gt;</button>
+        <button class="icon-button" type="button" data-share-album="${album.id}" aria-label="Share ${escapeHtml(album.title)}">S</button>
       </div>
     </article>
   `).join("");
@@ -393,7 +420,7 @@ function renderTracks(tracks) {
         ${playlistOptions}
       </select>
       <button class="icon-button remove-track-button" type="button" data-remove-track="${track.id}" ${canRemoveFromPlaylist ? "" : "disabled hidden"} aria-label="Remove ${escapeHtml(track.title)} from selected playlist">x</button>
-      <button class="icon-button favorite-button ${state.favorites.has(track.id) ? "active" : ""}" type="button" data-favorite-track="${track.id}" aria-label="Favorite ${escapeHtml(track.title)}">*</button>
+      <button class="icon-button share-button" type="button" data-share-track="${track.id}" aria-label="Share ${escapeHtml(track.title)}">S</button>
     </article>
   `).join("");
 }
@@ -463,8 +490,11 @@ function renderPlayer() {
 }
 
 function visibleTracks() {
+  if (state.search && state.semanticResults) {
+    return state.semanticResults.map(r => r.track);
+  }
+
   return sortedTracks(state.tracks.filter((track) => {
-    if (state.activeView === "favorites" && !state.favorites.has(track.id)) return false;
     if (state.activeView === "playlists") {
       const playlist = selectedPlaylist();
       if (!playlist || !playlist.trackIds.includes(track.id)) return false;
@@ -485,7 +515,7 @@ function visibleAlbums(tracks) {
 }
 
 function viewTitle() {
-  if (state.activeView === "favorites") return "Favorites";
+  if (state.search && state.semanticResults) return "✨ AI Semantic Results";
   if (state.activeView === "playlists") {
     return selectedPlaylist()?.name || "Playlists";
   }
@@ -556,16 +586,6 @@ function nextIndex() {
   return Math.min(state.queue.length - 1, state.currentIndex + 1);
 }
 
-async function toggleFavorite(trackId) {
-  const next = !state.favorites.has(trackId);
-  const result = await api(`/api/favorites/${encodeURIComponent(trackId)}`, {
-    method: "POST",
-    body: { favorite: next }
-  });
-  state.favorites = new Set(result.tracks || []);
-  render();
-}
-
 async function addTrackToPlaylist(trackId, playlistId) {
   const playlist = state.playlists.find((item) => item.id === playlistId);
   if (!playlist) return;
@@ -604,11 +624,11 @@ async function removeTrackFromSelectedPlaylist(trackId) {
   state.playlists = state.playlists.map((item) => item.id === updated.id ? updated : item);
   render();
 }
-
 async function removeSelectedTracksFromPlaylist() {
   const playlist = selectedPlaylist();
+  if (!playlist) return;
   const trackIds = Array.from(state.selectedTrackIds);
-  if (!playlist || !trackIds.length) return;
+  if (!trackIds.length) return;
 
   let updated = null;
   for (const trackId of trackIds) {
@@ -621,6 +641,51 @@ async function removeSelectedTracksFromPlaylist() {
   }
   state.selectedTrackIds.clear();
   render();
+}
+
+async function shareTrack(trackId) {
+  try {
+    const result = await api("/api/shares", {
+      method: "POST",
+      body: { trackId }
+    });
+    const shareUrl = `${window.location.origin}${result.url}`;
+    await navigator.clipboard.writeText(shareUrl);
+    alert(`Public share link copied to clipboard!\n\n${shareUrl}`);
+  } catch (err) {
+    console.error("Share failed:", err);
+    alert("Failed to create share link.");
+  }
+}
+
+async function shareAlbum(albumId) {
+  try {
+    const result = await api("/api/shares", {
+      method: "POST",
+      body: { albumId }
+    });
+    const shareUrl = `${window.location.origin}${result.url}`;
+    await navigator.clipboard.writeText(shareUrl);
+    alert(`Public album share link copied to clipboard!\n\n${shareUrl}`);
+  } catch (err) {
+    console.error("Share failed:", err);
+    alert("Failed to create share link.");
+  }
+}
+
+async function sharePlaylist(playlistId) {
+  try {
+    const result = await api("/api/shares", {
+      method: "POST",
+      body: { playlistId }
+    });
+    const shareUrl = `${window.location.origin}${result.url}`;
+    await navigator.clipboard.writeText(shareUrl);
+    alert(`Public playlist share link copied to clipboard!\n\n${shareUrl}`);
+  } catch (err) {
+    console.error("Share failed:", err);
+    alert("Failed to create share link.");
+  }
 }
 
 function currentTrack() {
